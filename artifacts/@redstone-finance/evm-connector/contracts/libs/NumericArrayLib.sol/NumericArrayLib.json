@@ -1,0 +1,16 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "NumericArrayLib",
+  "sourceName": "@redstone-finance/evm-connector/contracts/libs/NumericArrayLib.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "CanNotPickMedianOfEmptyArray",
+      "type": "error"
+    }
+  ],
+  "bytecode": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea2646970667358221220a18879e6e9776b39fe0a0a324bf80c4f2e596aa1c192d55d9277391286751bb264736f6c634300081c0033",
+  "deployedBytecode": "0x600080fdfea2646970667358221220a18879e6e9776b39fe0a0a324bf80c4f2e596aa1c192d55d9277391286751bb264736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

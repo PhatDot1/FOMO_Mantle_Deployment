@@ -1,0 +1,62 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IPriceOracle",
+  "sourceName": "contracts/FOMOInsurance.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "tokenSymbol",
+          "type": "string"
+        }
+      ],
+      "name": "getPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string[]",
+          "name": "tokenSymbols",
+          "type": "string[]"
+        }
+      ],
+      "name": "getPrices",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "prices",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isHealthy",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "healthy",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
