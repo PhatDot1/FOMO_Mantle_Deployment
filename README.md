@@ -1,7 +1,7 @@
 
 <img width="637" height="137" alt="Screenshot 2025-08-03 at 14 09 55" src="https://github.com/user-attachments/assets/06d788ce-5157-414d-bc44-bd3bb09d78e2" />
 
-FOMO Insurance is a decentralized protocol built on **Etherlink** that allows crypto holders to cash out their crypto for stablecoins *and still retain upside exposure* if the market rises after they exit. 
+FOMO Insurance is a decentralized protocol built on **Mantle** that allows crypto holders to cash out their crypto for stablecoins *and still retain upside exposure* if the market rises after they exit. 
 This provides a new risk-management primitive in DeFi that mirrors structured financial products in TradFi, giving users both immediate liquidity and a share of future gains. 
 
 **View the demo here**: https://fomo-insurance.vercel.app/
@@ -34,7 +34,7 @@ FOMO Insurance delivers the same core benefit - **partial upside retention** - i
 
 ## What We’ve Built
 
-FOMO Insurance is live on **Etherlink testnet** and consists of a multi-user flow:
+FOMO Insurance is live on **Mantle testnet** and consists of a multi-user flow:
 
 ### Seller Flow (Policy Creation)
 - User selects token, amount, and three terms:
@@ -84,20 +84,20 @@ As crypto adoption grows, users need **better portfolio tools**, and FOMO Insura
 
 ---
 
-## Powered by Etherlink
+## Powered by Mantle
 
-FOMO Insurance is deployed on **Etherlink** and is a good fit due to:
+FOMO Insurance is deployed on **Mantle** and is a good fit due to:
 - **High throughput & fast finality**: Viable for real-time policy creation and settlements
 - **Ultra-low fees**: Allows micro-policies and better UX without gas overhead
 - **Ethereum compatibility**: Users can cash out their MetaMask portfolios without friction
-- **Decentralised and upgradeable**: Inherits the robust security and governance framework of Tezos
+- **Modular architecture**: Built on Ethereum's proven security with enhanced scalability and performance
 
 ---
 
 ## Technical Overview
 
 - **Frontend:** Built in Next.js and TailwindCSS, deployed on Vercel  
-- **Contracts:** Solidity + Hardhat (deployed on Etherlink testnet)
+- **Contracts:** Solidity + Hardhat (deployed on Mantle testnet)
 
 ---
 
@@ -106,7 +106,7 @@ FOMO Insurance is deployed on **Etherlink** and is a good fit due to:
 ### Short-Term
 - Add visual analytics and track ROI per policy
 - Complete smart contract audits
-- Deploy to **Etherlink mainnet**
+- Deploy to **Mantle mainnet**
 - Support additional tokens
 
 ### Mid-Term

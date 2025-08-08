@@ -12,10 +12,10 @@ const barlow = Barlow_Semi_Condensed({
 })
 
 export const metadata: Metadata = {
-  title: "FOMO Insurance - Cash out without missing out",
+  title: "FOMO Insurance - Cash out without missing out | Built on Mantle",
   description:
-    "Sell your crypto while keeping a share of the upside.",
-  keywords: "DeFi, crypto insurance, FOMO, decentralized finance, crypto options",
+    "Sell your crypto while keeping a share of the upside. Decentralized insurance protocol built on Mantle network for fast, low-cost transactions.",
+  keywords: "DeFi, crypto insurance, FOMO, decentralized finance, crypto options, Mantle network, Ethereum L2",
 }
 
 export default function RootLayout({

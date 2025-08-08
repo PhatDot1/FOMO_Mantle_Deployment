@@ -283,33 +283,33 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Powered by Etherlink Section */}
+      {/* Powered by Mantle Section */}
       <section className="py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex justify-center mb-8">
-            <Image src="/images/etherlink-logo.svg" alt="Etherlink Logo" width={80} height={80} className="w-20 h-20" />
+            <Image src="/images/mantle-mnt-logo.png" alt="Mantle Logo" width={80} height={80} className="w-20 h-20" />
           </div>
 
-          <h2 className="text-4xl font-bold text-gray-900 mb-8">Powered by Etherlink</h2>
+          <h2 className="text-4xl font-bold text-gray-900 mb-8">Powered by Mantle</h2>
 
           <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-2xl mx-auto">
-            FOMO Insurance runs on Etherlink, a fast, low-cost Layer 2 rollup secured by Tezos. Etherlink enables:
+            FOMO Insurance runs on Mantle, a high-performance Layer 2 network built on Ethereum's security. Mantle enables:
           </p>
 
           <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Ultrafast transactions</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">High throughput</h3>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Robust security</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Ultra-low fees</h3>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">(Nearly) free transactions</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Ethereum compatibility</h3>
             </div>
           </div>
 
           <p className="text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
-            We're using Etherlink to deliver a faster, cheaper, and more reliable experience.
+            We're using Mantle to deliver fast finality, cost-effective transactions, and seamless DeFi integration.
           </p>
         </div>
       </section>
@@ -336,7 +336,7 @@ export default function LandingPage() {
                 What tokens are supported?
               </AccordionTrigger>
               <AccordionContent className="text-[17px] text-gray-600 leading-relaxed">
-                We currently support WETH and USDC on Etherlink testnet. Our supported token list is continuously
+                We currently support WETH and USDC on Mantle testnet. Our supported token list is continuously
                 expanding based on liquidity and community demand.
               </AccordionContent>
             </AccordionItem>
@@ -388,7 +388,7 @@ export default function LandingPage() {
                 Is my crypto safe while it's locked?
               </AccordionTrigger>
               <AccordionContent className="text-[17px] text-gray-600 leading-relaxed">
-                Your crypto is securely locked in audited smart contracts on Etherlink. The contracts are immutable and
+                Your crypto is securely locked in audited smart contracts on Mantle. The contracts are immutable and
                 handle settlement automatically based on oracle price feeds.
               </AccordionContent>
             </AccordionItem>
@@ -399,7 +399,7 @@ export default function LandingPage() {
               </AccordionTrigger>
               <AccordionContent className="text-[17px] text-gray-600 leading-relaxed">
                 Visit our <Link href="/faucet" className="text-blue-600 hover:underline">faucet page</Link> to claim free 
-                WETH and USDC test tokens for the Etherlink testnet. You can claim once every 24 hours.
+                WETH and USDC test tokens for the Mantle testnet. You can claim once every 24 hours.
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -418,13 +418,13 @@ export default function LandingPage() {
               <Link href="/faucet" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Faucet
               </Link>
-              <Link href="https://testnet.explorer.etherlink.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
+              <Link href="https://explorer.sepolia.mantle.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Explorer
               </Link>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-100 text-center text-gray-500 text-sm">
-            © 2024 FOMO Insurance. Powered by Etherlink.
+            © 2024 FOMO Insurance. Powered by Mantle.
           </div>
         </div>
       </footer>

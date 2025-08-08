@@ -841,7 +841,7 @@ export default function AppPage() {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Create Policy</h2>
             <div className="mb-8">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-                Etherlink Testnet
+                Mantle Testnet
               </span>
             </div>
 
