@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useAccount } from 'wagmi'
 import { useTomoWallet } from "@/contexts/tomo-wallet-context"
+import WaitlistSection from "@/components/WaitlistSection"
 
 
 export default function LandingPage() {
@@ -405,6 +406,9 @@ export default function LandingPage() {
           </Accordion>
         </div>
       </section>
+
+      {/* Waitlist Section */}
+      <WaitlistSection className="bg-gray-50" />
 
       {/* Footer */}
       <footer className="border-t border-gray-200 py-12">
