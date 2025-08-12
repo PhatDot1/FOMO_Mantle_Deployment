@@ -110,7 +110,7 @@ export default function LandingPage() {
                   </Button>
                 </Link>
               ) : (
-                <Button 
+                <Button
                   onClick={connectWallet}
                   disabled={isConnecting}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-medium rounded-lg transition-colors"
@@ -398,7 +398,7 @@ export default function LandingPage() {
                 How do I get test tokens?
               </AccordionTrigger>
               <AccordionContent className="text-[17px] text-gray-600 leading-relaxed">
-                Visit our <Link href="/faucet" className="text-blue-600 hover:underline">faucet page</Link> to claim free 
+                Visit our <Link href="/faucet" className="text-blue-600 hover:underline">faucet page</Link> to claim free
                 WETH and USDC test tokens for the Mantle testnet. You can claim once every 24 hours.
               </AccordionContent>
             </AccordionItem>
@@ -417,6 +417,9 @@ export default function LandingPage() {
               </Link>
               <Link href="/faucet" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Faucet
+              </Link>
+              <Link href="/privacy" className="text-gray-600 hover:text-blue-600 transition-colors">
+                Privacy Policy
               </Link>
               <Link href="https://explorer.sepolia.mantle.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Explorer
