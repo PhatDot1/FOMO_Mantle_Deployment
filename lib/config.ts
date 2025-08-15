@@ -1,11 +1,11 @@
 export const config = {
     contracts: {
-      mockUSDC: "0x2213eE1B450900Bdaf75DA5F17f38bAbdaED339c",
-      mockWETH: "0x6bEfd3014E8373E4a776b4F2b28134EA25C7b93A",
-      redStoneOracle: "0x20B695517D6b82E72E8AFdF83d4d2C351A79748D",
-      policyStorage: "0x41F8fEBb4EF425a3eF522D313c3277235aeA83DE",
-      policyManager: "0xc9D62b94eBe0EbDc68d695d4a5AA9017c0a41383",
-      settlementEngine: "0x6B6A30149b99A09b697805eA5b2AaDCbC396586a",
-      fomoInsurance: "0x7964bBECA179E4e00c02A71A84C6A327E3e808Cb",
+      mockUSDC: "0x34B68f19Ac9028a505bb6be756472ee800D6e88e",
+      mockWETH: "0x5B855A6913F962d377D70126038062D1BFe2bb14",
+      redStoneOracle: "0x1AC24F374baFcd0E2da27F1078CE8F4Da438561b",
+      policyStorage: "0x90E9058038bd81C1887c6Abd6A7144222924C044",
+      policyManager: "0xBC8b0b6d8a51d694beFe1522901d07629f3E5043",
+      settlementEngine: "0x8F2794B3af4f1DF45CB9eB1Bf712077eE99D253b",
+      fomoInsurance: "0xDE956862C0177B0129Ba54f4D8895d1bfEf0BF52",
     },
   } as const;
