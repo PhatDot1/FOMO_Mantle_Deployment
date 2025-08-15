@@ -4,11 +4,18 @@ import { createPublicClient, createWalletClient, http, parseAbi } from 'viem'
 import { mantleSepolia } from '@/lib/web3-config'
 import { CONTRACT_ADDRESSES } from '@/lib/web3-config'
 
-// Oracle ABI - just the functions we need
+// Real API Oracle ABI - based on your deployed contract
 const ORACLE_ABI = parseAbi([
   'function updateLivePrice(string symbol, uint256 price, uint8 confidence, string source) external',
   'function getPrice(string symbol) external view returns (uint256)',
+  'function getPrices(string[] symbols) external view returns (uint256[])',
   'function isHealthy() external view returns (bool)',
+  'function isSymbolSupported(string symbol) external view returns (bool)',
+  'function setHealthy(bool healthy) external',
+  'function owner() external view returns (address)',
+  'error PriceNotAvailable()',
+  'error SymbolNotSupported()',
+  'error Unauthorized()',
 ])
 
 // Create a public client for reading
@@ -106,11 +113,31 @@ export async function GET() {
       console.log('⚠️ No private key provided - returning prices without on-chain update')
     }
 
-    // 4. Verify current oracle prices
+    // 4. Verify current oracle prices with improved error handling
     const oracleStatus = []
     
     for (const update of priceUpdates) {
       try {
+        // First check if symbol is supported
+        const isSupported = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.PRICE_ORACLE,
+          abi: ORACLE_ABI,
+          functionName: 'isSymbolSupported',
+          args: [update.symbol],
+        })
+
+        if (!isSupported) {
+          oracleStatus.push({
+            symbol: update.symbol,
+            marketPrice: update.actualPrice,
+            oraclePrice: null,
+            lastUpdated: new Date().toISOString(),
+            status: 'NOT_SUPPORTED',
+            error: 'Symbol not supported by oracle'
+          })
+          continue
+        }
+
         const oraclePrice = await publicClient.readContract({
           address: CONTRACT_ADDRESSES.PRICE_ORACLE,
           abi: ORACLE_ABI,
@@ -128,13 +155,28 @@ export async function GET() {
           status: Math.abs(oraclePriceFormatted - update.actualPrice) < (update.actualPrice * 0.05) ? 'SYNCED' : 'DRIFT'
         })
       } catch (error) {
+        console.error(`Oracle error for ${update.symbol}:`, error)
+        
+        let errorMessage = 'Unknown error'
+        if (error.message?.includes('PriceNotAvailable')) {
+          errorMessage = 'Price not available'
+        } else if (error.message?.includes('SymbolNotSupported')) {
+          errorMessage = 'Symbol not supported'
+        } else if (error.message?.includes('0x94f5a41b')) {
+          errorMessage = 'Symbol not supported (0x94f5a41b)'
+        } else if (error.message?.includes('0xf45e167b')) {
+          errorMessage = 'Price not available (0xf45e167b)'
+        } else {
+          errorMessage = error.message
+        }
+
         oracleStatus.push({
           symbol: update.symbol,
           marketPrice: update.actualPrice,
           oraclePrice: null,
           lastUpdated: new Date().toISOString(),
           status: 'ERROR',
-          error: error.message
+          error: errorMessage
         })
       }
     }

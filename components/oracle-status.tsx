@@ -13,7 +13,7 @@ interface PriceStatus {
   marketPrice: number
   oraclePrice: number | null
   lastUpdated: string
-  status: 'SYNCED' | 'DRIFT' | 'ERROR'
+  status: 'SYNCED' | 'DRIFT' | 'ERROR' | 'NOT_SUPPORTED'
   error?: string
 }
 
@@ -94,6 +94,7 @@ export default function OracleStatus() {
       case 'SYNCED': return 'bg-green-100 text-green-700'
       case 'DRIFT': return 'bg-yellow-100 text-yellow-700'
       case 'ERROR': return 'bg-red-100 text-red-700'
+      case 'NOT_SUPPORTED': return 'bg-gray-100 text-gray-700'
       default: return 'bg-gray-100 text-gray-700'
     }
   }
@@ -237,6 +238,21 @@ export default function OracleStatus() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             <span className="ml-2 text-gray-600">Loading oracle status...</span>
+          </div>
+        )}
+
+        {/* Oracle Help Section */}
+        {oracleData?.priceStatus && oracleData.priceStatus.some(p => p.status === 'NOT_SUPPORTED' || p.status === 'ERROR') && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-800 mb-2">Oracle Setup Required</h4>
+            <div className="text-sm text-blue-700 space-y-1">
+              <p>Some tokens aren't supported yet. To fix this:</p>
+              <ol className="list-decimal list-inside space-y-1 mt-2">
+                <li>Run the oracle update script: <code className="bg-blue-100 px-1 rounded">npx hardhat run scripts/final-price-fix.js --network mantle_testnet</code></li>
+                <li>Or call the API with a private key: Add <code className="bg-blue-100 px-1 rounded">ORACLE_PRIVATE_KEY</code> to your .env.local</li>
+                <li>The oracle will automatically initialize missing tokens</li>
+              </ol>
+            </div>
           </div>
         )}
 
