@@ -1,4 +1,4 @@
-// components/oracle-status.tsx
+// components/oracle-status.tsx - FIXED: WETH and USDC only (no ETH)
 "use client"
 
 import { useState, useEffect } from 'react'
@@ -186,10 +186,12 @@ export default function OracleStatus() {
           </div>
         )}
 
-        {/* Price Status Grid */}
+        {/* Price Status Grid - WETH and USDC only */}
         {oracleData?.priceStatus && oracleData.priceStatus.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {oracleData.priceStatus.map((price) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {oracleData.priceStatus
+              .filter(price => price.symbol === 'WETH' || price.symbol === 'USDC') // ✅ FIXED: Only show WETH and USDC
+              .map((price) => (
               <div key={price.symbol} className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-semibold text-lg">{price.symbol}</h4>
@@ -248,7 +250,7 @@ export default function OracleStatus() {
             <div className="text-sm text-blue-700 space-y-1">
               <p>Some tokens aren't supported yet. To fix this:</p>
               <ol className="list-decimal list-inside space-y-1 mt-2">
-                <li>Run the oracle update script: <code className="bg-blue-100 px-1 rounded">npx hardhat run scripts/final-price-fix.js --network mantle_testnet</code></li>
+                <li>Run the oracle update script: <code className="bg-blue-100 px-1 rounded">npx hardhat run scripts/setup-contracts.js --network mantle_testnet</code></li>
                 <li>Or call the API with a private key: Add <code className="bg-blue-100 px-1 rounded">ORACLE_PRIVATE_KEY</code> to your .env.local</li>
                 <li>The oracle will automatically initialize missing tokens</li>
               </ol>
@@ -256,21 +258,17 @@ export default function OracleStatus() {
           </div>
         )}
 
-        {/* Market Data Summary */}
+        {/* Market Data Summary - ✅ FIXED: Show WETH and USDC only */}
         {oracleData?.marketData && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
               <TrendingUp className="w-4 h-4 mr-2" />
               Live Market Data (CoinGecko)
             </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-gray-600">ETH:</span>
-                <span className="ml-2 font-medium">${oracleData.marketData.ethereum?.usd?.toLocaleString() || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">BTC:</span>
-                <span className="ml-2 font-medium">${oracleData.marketData.bitcoin?.usd?.toLocaleString() || 'N/A'}</span>
+                <span className="text-gray-600">WETH:</span>
+                <span className="ml-2 font-medium">${oracleData.marketData.weth?.usd?.toLocaleString() || oracleData.marketData.ethereum?.usd?.toLocaleString() || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-gray-600">USDC:</span>

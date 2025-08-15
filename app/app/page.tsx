@@ -1,3 +1,4 @@
+// app/app/page.tsx - FIXED with WETH only (no ETH conversion)
 "use client"
 
 import { useState, useEffect } from "react"
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { AlertCircle, CheckCircle, Loader2, AlertTriangle, Info } from "lucide-react"
+import { AlertCircle, CheckCircle, Loader2, AlertTriangle, Info, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useAccount, useReadContract } from "wagmi"
 import { useTomoWallet } from "@/contexts/tomo-wallet-context"
@@ -25,13 +26,17 @@ import {
   useContractValidation,
   formatTokenAmount,
 } from "@/hooks/useContracts"
+import { useOraclePrices, formatPrice, calculateTokenValue } from "@/hooks/useOraclePrices"
 import { CONTRACT_ADDRESSES } from "@/lib/web3-config"
-import { MOCK_USDC_ABI, MOCK_WETH_ABI, POLICY_MANAGER_ABI } from "@/lib/contract-abis"
+import { MOCK_USDC_ABI, MOCK_WETH_ABI, POLICY_MANAGER_ABI, POLICY_STORAGE_ABI } from "@/lib/contract-abis"
 
 export default function AppPage() {
   // Wallet connection
   const { address, isConnected } = useAccount()
   const { connectWallet, isLoading: isConnecting } = useTomoWallet()
+
+  // ✅ FIXED: Dynamic oracle prices for WETH and USDC only
+  const { prices: oraclePrices, isLoading: pricesLoading, lastUpdated, refetch: refetchPrices } = useOraclePrices()
 
   // Form state
   const [amount, setAmount] = useState("")
@@ -51,7 +56,7 @@ export default function AppPage() {
   const [isWaitingForConfirmation, setIsWaitingForConfirmation] = useState(false)
 
   // Filter state
-  const [payoutRange, setPayoutRange] = useState([75, 98])
+  const [payoutRange, setPayoutRange] = useState([50, 99])
   const [durationRange, setDurationRange] = useState([1, 90])
   const [upsideRange, setUpsideRange] = useState([10, 50])
   const [statusFilter, setStatusFilter] = useState({
@@ -81,7 +86,7 @@ export default function AppPage() {
     error: approvalError,
   } = useTokenApproval(selectedToken)
 
-  //   USDC approval hook for purchasing policies
+  // USDC approval hook for purchasing policies
   const {
     approve: approveUsdc,
     isPending: isApprovingUsdc,
@@ -89,19 +94,16 @@ export default function AppPage() {
     error: usdcApprovalError,
   } = useTokenApproval("USDC")
 
-  //   Competitive Score calculation
+  // Competitive Score calculation
   const calculateCompetitiveScore = () => {
-    const p = immediatePayout[0] / 100 // Convert percentage to decimal
-    const u = upsideShare[0] / 100 // Convert percentage to decimal
+    const p = immediatePayout[0] / 100
+    const u = upsideShare[0] / 100
 
     try {
-      // Formula: Score = 2.699 * ln(0.495 * ((1 - p) / u)) - 1.137
       const innerValue = 0.495 * ((1 - p) / u)
-      if (innerValue <= 0) return 1 // Handle edge case where ln would be undefined
+      if (innerValue <= 0) return 1
 
       const score = 2.699 * Math.log(innerValue) + 11.137
-
-      // Bound the score between 1 and 10
       return Math.max(0, Math.min(10, score))
     } catch (error) {
       console.error("Error calculating competitive score:", error)
@@ -109,7 +111,7 @@ export default function AppPage() {
     }
   }
 
-  //   Get score color and tooltip
+  // Get score color and tooltip
   const getScoreDisplay = (score: number) => {
     if (score >=0 && score <= 3) {
       return {
@@ -147,7 +149,7 @@ export default function AppPage() {
   const competitiveScore = calculateCompetitiveScore()
   const scoreDisplay = getScoreDisplay(competitiveScore)
 
-  //   Apply filters function
+  // Apply filters function
   const applyFilters = () => {
     if (!openPolicyIds) {
       setFilteredPolicyIds([])
@@ -155,7 +157,6 @@ export default function AppPage() {
     }
 
     const filtered = openPolicyIds.filter((policyId) => {
-      // We'll need to get the policy data to filter - this will be handled in the PolicyCard component
       return true // For now, we'll filter in the display logic
     })
 
@@ -197,7 +198,7 @@ export default function AppPage() {
     },
   })
 
-  //   Read USDC allowance for policy purchases
+  // Read USDC allowance for policy purchases
   const { data: usdcAllowance, refetch: refetchUsdcAllowance } = useReadContract({
     address: CONTRACT_ADDRESSES.MOCK_USDC,
     abi: MOCK_USDC_ABI,
@@ -211,8 +212,8 @@ export default function AppPage() {
     },
   })
 
-  // Mock price data
-  const mockPrices = { WETH: 3395.99, USDC: 1 }
+  // ✅ FIXED: Use oracle prices for WETH and USDC
+  console.log('📊 Current oracle prices:', oraclePrices)
 
   // Enhanced form validation with detailed error messages
   const validateForm = () => {
@@ -236,13 +237,19 @@ export default function AppPage() {
     return { isValid: true, error: null }
   }
 
-  // Calculate values with error handling
+  // ✅ FIXED: Calculate values with WETH and USDC prices
   const calculateValues = () => {
     try {
-      const tokenPrice = mockPrices[selectedToken]
-      const totalValue = Number.parseFloat(amount || "0") * tokenPrice
+      const tokenPrice = oraclePrices[selectedToken] // Use WETH or USDC price directly
+      const totalValue = calculateTokenValue(amount || "0", tokenPrice)
       const immediateReceive = totalValue * (immediatePayout[0] / 100)
       const exampleUpside = totalValue * (selectedScenario / 100) * (upsideShare[0] / 100)
+      
+      console.log(`💰 Calculating with oracle prices:`)
+      console.log(`  ${selectedToken} price: ${formatPrice(tokenPrice)}`)
+      console.log(`  Amount: ${amount}`)
+      console.log(`  Total value: ${formatPrice(totalValue)}`)
+      
       return { totalValue, immediateReceive, exampleUpside }
     } catch (error) {
       console.error("Error calculating values:", error)
@@ -324,7 +331,7 @@ export default function AppPage() {
     }
   }
 
-  // Handle policy creation with enhanced validation and error handling
+  // ✅ FIXED: Handle policy creation with WETH symbol (not ETH)
   const handleCreatePolicy = async () => {
     try {
       // Pre-flight checks
@@ -367,8 +374,9 @@ export default function AppPage() {
       }
 
       // Parameter validation
-      if (immediatePayout[0] < 90 || immediatePayout[0] > 98) {
-        setErrorMessage("Immediate payout must be between 90% and 98%")
+      if (immediatePayout[0] < 50 || immediatePayout[0] > 99) {
+        setErrorMessage("Immediate payout must be between 50% and 99%")
+      
         setShowErrorAlert(true)
         return
       }
@@ -388,12 +396,12 @@ export default function AppPage() {
       setShowErrorAlert(false)
       setShowWarningAlert(false)
 
-      //  FIX: Use proper symbols for price oracle
-      const tokenSymbolForOracle = selectedToken === "WETH" ? "ETH" : "USDC"
+      // ✅ FIXED: Use WETH and USDC symbols directly (no conversion to ETH)
+      const tokenSymbolForOracle = selectedToken // Use "WETH" or "USDC" directly
 
       const policyParams = {
         token: CONTRACT_ADDRESSES[`MOCK_${selectedToken}`],
-        tokenSymbol: tokenSymbolForOracle, // Use ETH/USDC for price oracle
+        tokenSymbol: tokenSymbolForOracle, // ✅ FIXED: Use WETH/USDC directly
         amount,
         payoutToken: CONTRACT_ADDRESSES.MOCK_USDC,
         payoutBps: immediatePayout[0] * 100,
@@ -401,8 +409,8 @@ export default function AppPage() {
         upsideShareBps: upsideShare[0] * 100,
       }
 
-      console.log("Creating policy with params:", policyParams)
-      console.log("Token symbol for oracle:", tokenSymbolForOracle)
+      console.log("✅ Creating policy with CORRECT params:", policyParams)
+      console.log("✅ Token symbol for oracle:", tokenSymbolForOracle)
       console.log("Duration in seconds:", policyParams.duration)
       console.log("PayoutBps:", policyParams.payoutBps)
       console.log("UpsideShareBps:", policyParams.upsideShareBps)
@@ -464,7 +472,7 @@ export default function AppPage() {
     }
   }, [isApprovalSuccess, refetchAllowance, selectedToken])
 
-  //   USDC approval success handling
+  // USDC approval success handling
   useEffect(() => {
     if (isUsdcApprovalSuccess) {
       console.log("USDC approval transaction successful!")
@@ -502,7 +510,7 @@ export default function AppPage() {
     }
   }, [policyCreated, refetchAllowance, refetchTokenBalance, refetchOpenPolicies])
 
-  //   Policy purchase success handling
+  // Policy purchase success handling
   useEffect(() => {
     if (policyPurchased) {
       console.log("Policy purchased successfully!")
@@ -531,7 +539,7 @@ export default function AppPage() {
     }
   }, [createError])
 
-  //   Purchase error handling
+  // Purchase error handling
   useEffect(() => {
     if (purchaseError) {
       const errorMsg = getErrorMessage(purchaseError, "Policy purchase")
@@ -550,7 +558,7 @@ export default function AppPage() {
     }
   }, [approvalError, selectedToken])
 
-  //   USDC approval error handling
+  // USDC approval error handling
   useEffect(() => {
     if (usdcApprovalError) {
       const errorMsg = getErrorMessage(usdcApprovalError, "USDC approval")
@@ -586,22 +594,20 @@ export default function AppPage() {
     }
   }, [isConnected, isPaused, isContractValid])
 
-  //  ENHANCED PolicyCard component with filtering logic
+  // ENHANCED PolicyCard component with filtering logic
   const PolicyCard = ({ policyId }: { policyId: number }) => {
     const {
       data: policy,
       error: policyError,
       refetch: refetchPolicy,
     } = useReadContract({
-      address: CONTRACT_ADDRESSES.POLICY_MANAGER,
-      abi: POLICY_MANAGER_ABI,
+      address: CONTRACT_ADDRESSES.POLICY_STORAGE,
+      abi: POLICY_STORAGE_ABI,
       functionName: "getPolicy",
       args: [BigInt(policyId)],
-      query: {
-        retry: 3,
-        retryDelay: 1000,
-      },
+      query: { retry: 3, retryDelay: 1000 },
     })
+    
 
     if (policyError) {
       console.error(`PolicyCard error for policy ${policyId}:`, policyError)
@@ -627,18 +633,32 @@ export default function AppPage() {
       )
     }
 
-    //   Apply filters to this policy
-    const tokenSymbol = policy.tokenSymbol === "ETH" ? "WETH" : policy.tokenSymbol
+    // ✅ FIXED: Handle token symbols correctly (WETH should stay WETH)
+    const tokenSymbol = policy.tokenSymbol // Keep original: "WETH" or "USDC"
     const tokenAmount = formatTokenAmount(policy.amount, tokenSymbol as "WETH" | "USDC")
     const payoutAmount = formatTokenAmount(policy.payoutAmount, "USDC")
     const upsideSharePercent = Number(policy.upsideShareBps) / 100
     const durationDays = Number(policy.duration) / (24 * 60 * 60)
-    const payoutPercent = (Number(policy.payoutAmount) * 100) / (Number(policy.amount) * 1700) // Approximate payout percentage
-
+    const payoutPercent = (() => {
+      try {
+        // amount in token units -> human
+        const amt = Number(formatTokenAmount(policy.amount, tokenSymbol as "WETH" | "USDC")) // e.g., 0.5
+        const entryUsd = Number(policy.entryPrice) / 1e8 // price in USD
+        const totalUsd = amt * entryUsd
+    
+        // payoutAmount is USDC (6d) -> human
+        const payoutUsd = Number(formatTokenAmount(policy.payoutAmount, "USDC"))
+    
+        return totalUsd > 0 ? (payoutUsd / totalUsd) * 100 : 0
+      } catch {
+        return 0
+      }
+    })()
+    
     const stateNames = ["Open", "Active", "Settled", "Cancelled"]
     const stateName = stateNames[policy.state] || "Unknown"
 
-    //   Filter logic - hide policy if it doesn't match filters
+    // Filter logic - hide policy if it doesn't match filters
     if (filtersApplied) {
       // Check payout range (approximate since we don't have exact payout percentage)
       if (payoutPercent < payoutRange[0] || payoutPercent > payoutRange[1]) {
@@ -666,12 +686,12 @@ export default function AppPage() {
       }
     }
 
-    //  ENHANCED: Check if buyer can afford the policy
+    // ENHANCED: Check if buyer can afford the policy
     const payoutAmountBigInt = policy.payoutAmount
     const hasEnoughUsdcBalance = usdcBalance ? usdcBalance >= payoutAmountBigInt : false
     const hasEnoughUsdcAllowance = usdcAllowance ? usdcAllowance >= payoutAmountBigInt : false
 
-    //   Handle USDC approval for purchasing
+    // Handle USDC approval for purchasing
     const handleApproveUsdc = async () => {
       try {
         console.log("Approving USDC for policy purchase...")
@@ -688,7 +708,7 @@ export default function AppPage() {
           return
         }
 
-        //   Pre-purchase validation
+        // Pre-purchase validation
         if (!hasEnoughUsdcBalance) {
           setErrorMessage(
             `Insufficient USDC balance. You need ${Number.parseFloat(payoutAmount).toFixed(2)} USDC but only have ${Number.parseFloat(formattedUsdcBalance).toFixed(2)}`,
@@ -844,11 +864,37 @@ export default function AppPage() {
 
           {/* Policy Creation Form */}
           <section className="mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Create Policy</h2>
-            <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-3xl font-bold text-gray-900">Create Policy</h2>
+              {/* Price refresh button */}
+              <Button
+                onClick={() => refetchPrices()}
+                disabled={pricesLoading}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${pricesLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh Prices</span>
+              </Button>
+            </div>
+
+            {/* Price status indicator */}
+            <div className="mb-8 flex items-center space-x-4">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
                 Mantle Sepolia Testnet
               </span>
+              {lastUpdated && (
+                <span className="text-sm text-gray-500">
+                  Prices updated: {lastUpdated.toLocaleTimeString()}
+                </span>
+              )}
+              {pricesLoading && (
+                <span className="text-sm text-blue-600 flex items-center">
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  Loading prices...
+                </span>
+              )}
             </div>
 
             {/* Enhanced Alerts */}
@@ -909,8 +955,17 @@ export default function AppPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* Show dynamic price */}
                     {amount && selectedToken && isFormValid && (
-                      <p className="text-sm text-gray-600">≈ ${totalValue.toLocaleString()}</p>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-600">
+                          ≈ {formatPrice(totalValue)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {selectedToken} price: {formatPrice(oraclePrices[selectedToken])} 
+                          {pricesLoading && <span className="ml-1">(updating...)</span>}
+                        </p>
+                      </div>
                     )}
                     {isConnected && (
                       <div className="space-y-1">
@@ -935,17 +990,18 @@ export default function AppPage() {
                         <span className="text-lg font-semibold text-blue-600">{immediatePayout[0]}%</span>
                       </div>
                       <Slider
-                        value={immediatePayout}
-                        onValueChange={setImmediatePayout}
-                        max={98}
-                        min={90}
-                        step={1}
-                        className="w-full [&_[data-radix-slider-track]]:bg-gray-200 [&_[data-radix-slider-range]]:bg-blue-600 [&_[data-radix-slider-thumb]]:bg-blue-600 [&_[data-radix-slider-thumb]]:border-blue-600 [&_[data-radix-slider-thumb]]:ring-0"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 mt-2">
-                        <span>90%</span>
-                        <span>98%</span>
-                      </div>
+  value={immediatePayout}
+  onValueChange={setImmediatePayout}
+  max={99}
+  min={50}
+  step={1}
+  className="w-full [&_[data-radix-slider-track]]:bg-gray-200 [&_[data-radix-slider-range]]:bg-blue-600 [&_[data-radix-slider-thumb]]:bg-blue-600 [&_[data-radix-slider-thumb]]:border-blue-600 [&_[data-radix-slider-thumb]]:ring-0"
+/>
+<div className="flex justify-between text-xs text-gray-500 mt-2">
+  <span>50%</span>
+  <span>99%</span>
+</div>
+
                     </div>
 
                     <div>
@@ -1007,11 +1063,11 @@ export default function AppPage() {
 
                   <div className="bg-white rounded-lg p-4 border border-gray-200 mb-6">
                     <p className="text-sm text-gray-600 mb-1">You'll receive now:</p>
-                    <p className="text-2xl font-bold text-gray-900">${immediateReceive.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatPrice(immediateReceive)}</p>
                     <p className="text-sm text-gray-600">in USDC</p>
                   </div>
 
-                  {/*   Competitive Score */}
+                  {/* Competitive Score */}
                   <div className="bg-white rounded-lg p-4 border border-gray-200 mb-6">
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-600">Competitive Score</p>
@@ -1056,7 +1112,7 @@ export default function AppPage() {
 
                         <div className="bg-white rounded-lg p-4 border border-gray-200">
                           <div className="mb-2">
-                            <span className="text-2xl font-bold text-green-600">${exampleUpside.toLocaleString()}</span>
+                            <span className="text-2xl font-bold text-green-600">{formatPrice(exampleUpside)}</span>
                           </div>
                           <p className="text-sm text-gray-600 mb-1">Your additional upside share</p>
                           <p className="text-xs text-gray-500">Market +{selectedScenario}% scenario</p>
@@ -1163,17 +1219,18 @@ export default function AppPage() {
                 <div>
                   <Label className="text-sm font-medium text-gray-900 mb-4 block">Immediate Payout %</Label>
                   <Slider
-                    value={payoutRange}
-                    onValueChange={setPayoutRange}
-                    max={98}
-                    min={90}
-                    step={1}
-                    className="w-full [&_[data-radix-slider-track]]:bg-gray-200 [&_[data-radix-slider-range]]:bg-blue-600 [&_[data-radix-slider-thumb]]:bg-blue-600 [&_[data-radix-slider-thumb]]:border-blue-600"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>{payoutRange[0]}%</span>
-                    <span>{payoutRange[1]}%</span>
-                  </div>
+  value={payoutRange}
+  onValueChange={setPayoutRange}
+  max={99}
+  min={50}
+  step={1}
+  className="w-full [&_[data-radix-slider-track]]:bg-gray-200 [&_[data-radix-slider-range]]:bg-blue-600 [&_[data-radix-slider-thumb]]:bg-blue-600 [&_[data-radix-slider-thumb]]:border-blue-600"
+/>
+<div className="flex justify-between text-xs text-gray-500 mt-2">
+  <span>{payoutRange[0]}%</span>
+  <span>{payoutRange[1]}%</span>
+</div>
+
                 </div>
 
                 <div>
