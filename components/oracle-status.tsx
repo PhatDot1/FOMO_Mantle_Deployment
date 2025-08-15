@@ -172,7 +172,7 @@ export default function OracleStatus() {
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700">
                   Oracle is healthy and connected. 
-                  {oracleData.updatedWithPrivateKey ? ' Prices updated on-chain.' : ' Read-only mode (no private key).'}
+                  {oracleData.updatedWithPrivateKey ? ' Prices updated on-chain.' : ''}
                 </AlertDescription>
               </Alert>
             ) : (
