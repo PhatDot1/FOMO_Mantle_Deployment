@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertCircle, CheckCircle, Clock, Coins } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useAccount, useConnect } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useTomoWallet } from '@/contexts/tomo-wallet-context'
 import { useFaucetBalance, useFaucetCooldown, useFaucetClaim, formatTokenAmount } from '@/hooks/useContracts'
 
@@ -135,11 +135,11 @@ export default function FaucetPage() {
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Test Token Faucet</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Get test WETH and USDC tokens for the Mantle testnet. Use these tokens to test the FOMO Insurance protocol.
+            Get test WETH and USDC tokens for the Mantle Sepolia testnet. Use these tokens to test the FOMO Insurance protocol.
           </p>
           <div className="mt-6">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-              Mantle Testnet
+              Mantle Sepolia Testnet
             </span>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function FaucetPage() {
           <Alert className="mb-8">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Please connect your wallet to the Mantle testnet to use the faucet.
+              Please connect your wallet to the Mantle Sepolia testnet to use the faucet.
             </AlertDescription>
           </Alert>
         )}
@@ -359,7 +359,7 @@ export default function FaucetPage() {
                 </div>
                 <h3 className="font-semibold mb-2">Connect Wallet</h3>
                 <p className="text-sm text-gray-600">
-                  Connect your wallet to the Mantle testnet
+                  Connect your wallet to the Mantle Sepolia testnet
                 </p>
               </div>
               <div className="text-center">
@@ -388,7 +388,7 @@ export default function FaucetPage() {
                 <li>• These are test tokens with no real value</li>
                 <li>• There's a 24-hour cooldown between faucet claims</li>
                 <li>• Maximum claim amounts: 10 WETH, 10,000 USDC</li>
-                <li>• Only works on Mantle testnet</li>
+                <li>• Only works on Mantle Sepolia testnet</li>
               </ul>
             </div>
           </CardContent>

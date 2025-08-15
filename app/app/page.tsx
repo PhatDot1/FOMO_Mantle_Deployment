@@ -14,6 +14,7 @@ import { AlertCircle, CheckCircle, Loader2, AlertTriangle, Info } from "lucide-r
 import Link from "next/link"
 import { useAccount, useReadContract } from "wagmi"
 import { useTomoWallet } from "@/contexts/tomo-wallet-context"
+import OracleStatus from "@/components/oracle-status"
 import {
   useCreatePolicy,
   usePurchasePolicy,
@@ -836,12 +837,17 @@ export default function AppPage() {
         </header>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {/* Oracle Status Section */}
+          <section className="mb-12">
+            <OracleStatus />
+          </section>
+
           {/* Policy Creation Form */}
           <section className="mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Create Policy</h2>
             <div className="mb-8">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-                Mantle Testnet
+                Mantle Sepolia Testnet
               </span>
             </div>
 
