@@ -1,4 +1,4 @@
-// app/app/page.tsx - FIXED with WETH only (no ETH conversion)
+// app/app/page.tsx - UPDATED with MNT support
 "use client"
 
 import { useState, useEffect } from "react"
@@ -25,22 +25,34 @@ import {
   useTokenApproval,
   useContractValidation,
   formatTokenAmount,
+  SellableToken,
 } from "@/hooks/useContracts"
 import { useOraclePrices, formatPrice, calculateTokenValue } from "@/hooks/useOraclePrices"
 import { CONTRACT_ADDRESSES } from "@/lib/web3-config"
-import { MOCK_USDC_ABI, MOCK_WETH_ABI, POLICY_MANAGER_ABI, POLICY_STORAGE_ABI } from "@/lib/contract-abis"
+import { MOCK_USDC_ABI, MOCK_WETH_ABI, MOCK_MNT_ABI, POLICY_MANAGER_ABI, POLICY_STORAGE_ABI } from "@/lib/contract-abis"
 
 export default function AppPage() {
   // Wallet connection
   const { address, isConnected } = useAccount()
   const { connectWallet, isLoading: isConnecting } = useTomoWallet()
 
-  // ✅ FIXED: Dynamic oracle prices for WETH and USDC only
-  const { prices: oraclePrices, isLoading: pricesLoading, lastUpdated, refetch: refetchPrices } = useOraclePrices()
+  // ✅ PERFORMANCE: Use optimized oracle prices with caching
+  const { 
+    prices: oraclePrices, 
+    isLoading: pricesLoading, 
+    lastUpdated, 
+    refetch: refetchPrices,
+    error: pricesError 
+  } = useOraclePrices()
 
-  // Form state
+  // ✅ PERFORMANCE: Show price loading status
+  console.log('🔄 Oracle prices loading:', pricesLoading)
+  console.log('📊 Current oracle prices:', oraclePrices)
+  console.log('⚠️ Oracle prices error:', pricesError)
+
+  // Form state - ✅ UPDATED: Allow both WETH and MNT selection
   const [amount, setAmount] = useState("")
-  const [selectedToken, setSelectedToken] = useState<"WETH" | "USDC">("WETH")
+  const [selectedToken, setSelectedToken] = useState<SellableToken>("WETH")
   const [immediatePayout, setImmediatePayout] = useState([95])
   const [duration, setDuration] = useState([30])
   const [upsideShare, setUpsideShare] = useState([25])
@@ -67,9 +79,13 @@ export default function AppPage() {
   const [filteredPolicyIds, setFilteredPolicyIds] = useState<bigint[]>([])
   const [filtersApplied, setFiltersApplied] = useState(false)
 
-  // Contract hooks
+  // Contract hooks - ✅ FIXED: Properly get balance for selected token
   const { data: tokenBalance, refetch: refetchTokenBalance } = useFaucetBalance(selectedToken)
   const { data: usdcBalance, refetch: refetchUsdcBalance } = useFaucetBalance("USDC")
+  
+  // ✅ DEBUG: Log balances to help debug
+  console.log(`💰 Selected token: ${selectedToken}`)
+  console.log(`💰 Token balance:`, tokenBalance ? formatTokenAmount(tokenBalance, selectedToken) : 'undefined')
   const { createPolicy, isPending: isCreating, isSuccess: policyCreated, error: createError } = useCreatePolicy()
   const {
     purchasePolicy,
@@ -180,14 +196,19 @@ export default function AppPage() {
     isValid: isContractValid,
   } = useContractValidation()
 
-  // Read current allowance with enhanced error handling
+  // ✅ UPDATED: Read current allowance with dynamic token ABI
+  const getTokenABI = (token: SellableToken) => {
+    return token === "WETH" ? MOCK_WETH_ABI : 
+           token === "MNT" ? MOCK_MNT_ABI : MOCK_WETH_ABI;
+  }
+
   const {
     data: currentAllowance,
     refetch: refetchAllowance,
     error: allowanceError,
   } = useReadContract({
     address: CONTRACT_ADDRESSES[`MOCK_${selectedToken}`],
-    abi: selectedToken === "WETH" ? MOCK_WETH_ABI : MOCK_USDC_ABI,
+    abi: getTokenABI(selectedToken),
     functionName: "allowance",
     args: address ? [address, CONTRACT_ADDRESSES.POLICY_MANAGER] : undefined,
     query: {
@@ -212,7 +233,7 @@ export default function AppPage() {
     },
   })
 
-  // ✅ FIXED: Use oracle prices for WETH and USDC
+  // ✅ UPDATED: Use oracle prices for WETH, USDC, and MNT
   console.log('📊 Current oracle prices:', oraclePrices)
 
   // Enhanced form validation with detailed error messages
@@ -237,10 +258,10 @@ export default function AppPage() {
     return { isValid: true, error: null }
   }
 
-  // ✅ FIXED: Calculate values with WETH and USDC prices
+  // ✅ UPDATED: Calculate values with WETH, USDC, and MNT prices
   const calculateValues = () => {
     try {
-      const tokenPrice = oraclePrices[selectedToken] // Use WETH or USDC price directly
+      const tokenPrice = oraclePrices[selectedToken] // Use WETH, MNT, or USDC price directly
       const totalValue = calculateTokenValue(amount || "0", tokenPrice)
       const immediateReceive = totalValue * (immediatePayout[0] / 100)
       const exampleUpside = totalValue * (selectedScenario / 100) * (upsideShare[0] / 100)
@@ -262,7 +283,7 @@ export default function AppPage() {
   // Enhanced form validation
   const formValidation = validateForm()
   const isFormValid = formValidation.isValid
-  const tokenDecimals = selectedToken === "WETH" ? 18 : 6
+  const tokenDecimals = (selectedToken === "WETH" || selectedToken === "MNT") ? 18 : 6
   const amountAsBigInt = isFormValid ? parseUnits(amount, tokenDecimals) : 0n
   const hasEnoughAllowance = currentAllowance ? currentAllowance >= amountAsBigInt : false
   const hasEnoughBalance = tokenBalance ? tokenBalance >= amountAsBigInt : false
@@ -331,7 +352,7 @@ export default function AppPage() {
     }
   }
 
-  // ✅ FIXED: Handle policy creation with WETH symbol (not ETH)
+  // ✅ UPDATED: Handle policy creation with proper token symbol
   const handleCreatePolicy = async () => {
     try {
       // Pre-flight checks
@@ -376,7 +397,6 @@ export default function AppPage() {
       // Parameter validation
       if (immediatePayout[0] < 50 || immediatePayout[0] > 99) {
         setErrorMessage("Immediate payout must be between 50% and 99%")
-      
         setShowErrorAlert(true)
         return
       }
@@ -396,12 +416,12 @@ export default function AppPage() {
       setShowErrorAlert(false)
       setShowWarningAlert(false)
 
-      // ✅ FIXED: Use WETH and USDC symbols directly (no conversion to ETH)
-      const tokenSymbolForOracle = selectedToken // Use "WETH" or "USDC" directly
+      // ✅ UPDATED: Use WETH, MNT, and USDC symbols directly
+      const tokenSymbolForOracle = selectedToken // Use "WETH", "MNT", or "USDC" directly
 
       const policyParams = {
         token: CONTRACT_ADDRESSES[`MOCK_${selectedToken}`],
-        tokenSymbol: tokenSymbolForOracle, // ✅ FIXED: Use WETH/USDC directly
+        tokenSymbol: tokenSymbolForOracle, // ✅ UPDATED: Use WETH/MNT directly
         amount,
         payoutToken: CONTRACT_ADDRESSES.MOCK_USDC,
         payoutBps: immediatePayout[0] * 100,
@@ -633,16 +653,16 @@ export default function AppPage() {
       )
     }
 
-    // ✅ FIXED: Handle token symbols correctly (WETH should stay WETH)
-    const tokenSymbol = policy.tokenSymbol // Keep original: "WETH" or "USDC"
-    const tokenAmount = formatTokenAmount(policy.amount, tokenSymbol as "WETH" | "USDC")
+    // ✅ UPDATED: Handle token symbols correctly (WETH, MNT should stay as-is)
+    const tokenSymbol = policy.tokenSymbol // Keep original: "WETH", "MNT", or "USDC"
+    const tokenAmount = formatTokenAmount(policy.amount, tokenSymbol as SellableToken)
     const payoutAmount = formatTokenAmount(policy.payoutAmount, "USDC")
     const upsideSharePercent = Number(policy.upsideShareBps) / 100
     const durationDays = Number(policy.duration) / (24 * 60 * 60)
     const payoutPercent = (() => {
       try {
         // amount in token units -> human
-        const amt = Number(formatTokenAmount(policy.amount, tokenSymbol as "WETH" | "USDC")) // e.g., 0.5
+        const amt = Number(formatTokenAmount(policy.amount, tokenSymbol as SellableToken)) // e.g., 0.5
         const entryUsd = Number(policy.entryPrice) / 1e8 // price in USD
         const totalUsd = amt * entryUsd
     
@@ -879,7 +899,7 @@ export default function AppPage() {
               </Button>
             </div>
 
-            {/* Price status indicator */}
+            {/* ✅ PERFORMANCE: Enhanced price status indicator */}
             <div className="mb-8 flex items-center space-x-4">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
                 Mantle Sepolia Testnet
@@ -893,6 +913,18 @@ export default function AppPage() {
                 <span className="text-sm text-blue-600 flex items-center">
                   <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                   Loading prices...
+                </span>
+              )}
+              {pricesError && (
+                <span className="text-sm text-orange-600 flex items-center">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  Using cached prices
+                </span>
+              )}
+              {!pricesLoading && !pricesError && (
+                <span className="text-sm text-green-600 flex items-center">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Live prices
                 </span>
               )}
             </div>
@@ -946,12 +978,14 @@ export default function AppPage() {
                         />
                         {!isFormValid && amount && <p className="text-sm text-red-500 mt-1">{formValidation.error}</p>}
                       </div>
-                      <Select value={selectedToken} onValueChange={(value: "WETH" | "USDC") => setSelectedToken(value)}>
+                      {/* ✅ UPDATED: Token selection now includes MNT */}
+                      <Select value={selectedToken} onValueChange={(value: SellableToken) => setSelectedToken(value)}>
                         <SelectTrigger className="w-32 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                           <SelectValue placeholder="Token" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="WETH">WETH</SelectItem>
+                          <SelectItem value="MNT">MNT</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -971,6 +1005,10 @@ export default function AppPage() {
                       <div className="space-y-1">
                         <p className="text-base text-gray-500">
                           Balance: {Number.parseFloat(formattedBalance).toFixed(4)} {selectedToken}
+                        </p>
+                        {/* ✅ DEBUG: Show what balance we're actually getting */}
+                        <p className="text-xs text-gray-400">
+                          Debug: {tokenBalance ? `Raw: ${tokenBalance.toString()}, Formatted: ${formattedBalance}` : 'No balance data'}
                         </p>
                         {!hasEnoughBalance && isFormValid && (
                           <p className="text-sm text-red-500">

@@ -1,4 +1,4 @@
-// app/providers.tsx
+// app/providers.tsx - FIXED unified provider
 "use client"
 
 import type React from "react"
@@ -8,8 +8,9 @@ import { createConfig, http } from 'wagmi'
 import { defineChain } from 'viem'
 import { metaMask, walletConnect } from 'wagmi/connectors'
 import { TomoWalletProvider } from "@/contexts/tomo-wallet-context"
+import { useState } from 'react'
 
-// Define Mantle Sepolia Testnet chain
+// ✅ FIXED: Single chain definition matching your deployment
 const mantleSepolia = defineChain({
   id: 5003,
   name: 'Mantle Sepolia Testnet',
@@ -20,7 +21,10 @@ const mantleSepolia = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://endpoints.omniatech.io/v1/mantle/sepolia/public'],
+      http: ['https://rpc.sepolia.mantle.xyz'], // ✅ Official RPC
+    },
+    public: {
+      http: ['https://rpc.sepolia.mantle.xyz'],
     },
   },
   blockExplorers: {
@@ -32,7 +36,7 @@ const mantleSepolia = defineChain({
   testnet: true,
 })
 
-// Create wagmi config with standard configuration
+// ✅ PERFORMANCE: Optimized Wagmi config
 const config = createConfig({
   chains: [mantleSepolia],
   connectors: [
@@ -42,23 +46,37 @@ const config = createConfig({
     }),
   ],
   transports: {
-    [mantleSepolia.id]: http(),
+    [mantleSepolia.id]: http('https://rpc.sepolia.mantle.xyz', {
+      batch: true, // ✅ Enable batching for better performance
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
   },
   ssr: true,
+  // ✅ PERFORMANCE: Optimize polling
+  pollingInterval: 4000, // 4 seconds instead of default
 })
 
-// Create a QueryClient
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 3,
-      retryDelay: 1000,
-    },
-  },
-})
-
-// Set up the Providers component
+// ✅ PERFORMANCE: Single QueryClient instance
 export function Providers({ children }: { children: React.ReactNode }) {
+  // ✅ CRITICAL: Use useState to ensure single instance
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        // ✅ PERFORMANCE: Optimized cache settings
+        staleTime: 30 * 1000, // 30 seconds
+        cacheTime: 5 * 60 * 1000, // 5 minutes
+        retry: 2, // Reduce retries for speed
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+        refetchOnWindowFocus: false, // ✅ Prevent whitescreens
+        refetchOnReconnect: true,
+      },
+      mutations: {
+        retry: 1,
+      },
+    },
+  }))
+
   return (
     <QueryClientProvider client={queryClient}>
       <WagmiProvider config={config}>

@@ -7,83 +7,136 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertCircle, CheckCircle, Clock, Coins } from "lucide-react"
+import { AlertCircle, CheckCircle, Coins, Zap } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAccount } from 'wagmi'
 import { useTomoWallet } from '@/contexts/tomo-wallet-context'
-import { useFaucetBalance, useFaucetCooldown, useFaucetClaim, formatTokenAmount } from '@/hooks/useContracts'
+import { useFaucetBalance, useFaucetClaim, useFaucetCooldown, formatTokenAmount, AnyToken } from '@/hooks/useContracts'
 
 export default function FaucetPage() {
-  const [selectedToken, setSelectedToken] = useState<'WETH' | 'USDC'>('WETH')
+  // ✅ OPTIMIZED: Simplified state for testing
+  const [selectedToken, setSelectedToken] = useState<AnyToken>('WETH')
   const [customAmount, setCustomAmount] = useState('')
   const [useCustomAmount, setUseCustomAmount] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [showError, setShowError] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   
   const { address, isConnected } = useAccount()
   const { connectWallet, isConnecting } = useTomoWallet()
   
-  // Contract hooks
-  const { data: balance, refetch: refetchBalance } = useFaucetBalance(selectedToken)
+  // ✅ OPTIMIZED: Fetch all balances for better UX
+  const { data: wethBalance, refetch: refetchWethBalance } = useFaucetBalance('WETH')
+  const { data: usdcBalance, refetch: refetchUsdcBalance } = useFaucetBalance('USDC')
+  const { data: mntBalance, refetch: refetchMntBalance } = useFaucetBalance('MNT')
+  
+  // ✅ ADDED: Cooldown hooks for proper faucet management
   const { canUseFaucet, timeLeft } = useFaucetCooldown(selectedToken)
   const { claimFaucet, isPending, isSuccess, error } = useFaucetClaim(selectedToken)
   
-  // Token configuration
+  // ✅ UPDATED: Token configuration reflecting actual contract capabilities
   const tokenConfig = {
     WETH: {
       name: 'Wrapped Ether',
       symbol: 'WETH',
       decimals: 18,
-      maxFaucetAmount: '10',
-      defaultFaucetAmount: '10'
+      maxFaucetAmount: '100', 
+      defaultFaucetAmount: '10',
+      supportsCustomAmount: true // ✨ WETH supports custom amounts
     },
     USDC: {
       name: 'USD Coin',
       symbol: 'USDC', 
       decimals: 6,
-      maxFaucetAmount: '10000',
-      defaultFaucetAmount: '10000'
+      maxFaucetAmount: '50000', 
+      defaultFaucetAmount: '1000',
+      supportsCustomAmount: true // ✨ USDC supports custom amounts
+    },
+    MNT: {
+      name: 'Mantle',
+      symbol: 'MNT',
+      decimals: 18,
+      maxFaucetAmount: '100', 
+      defaultFaucetAmount: '100', // ✨ Fixed amount only
+      supportsCustomAmount: false // ✨ MNT only supports fixed 100 MNT
     }
   }
   
   const currentConfig = tokenConfig[selectedToken]
   
-  // Format time remaining
-  const formatTimeRemaining = (seconds: bigint): string => {
-    const totalSeconds = Number(seconds)
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const remainingSeconds = totalSeconds % 60
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${remainingSeconds}s`
-    } else if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`
-    } else {
-      return `${remainingSeconds}s`
-    }
-  }
-  
-  // Handle faucet claim
-  const handleClaimFaucet = () => {
+  // ✅ OPTIMIZED: Handle faucet claim with better error handling
+  const handleClaimFaucet = async () => {
     if (!isConnected) {
-      connectWallet()
+      await connectWallet()
       return
     }
     
-    if (useCustomAmount && customAmount) {
-      claimFaucet(customAmount)
-    } else {
-      claimFaucet()
+    setShowError(false)
+    setShowSuccess(false)
+    
+    try {
+      // ✨ FIXED: Only pass custom amount if token supports it and user selected custom
+      if (useCustomAmount && customAmount && currentConfig.supportsCustomAmount) {
+        claimFaucet(customAmount)
+      } else {
+        claimFaucet() // Always use default for MNT or when custom not selected
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to claim tokens')
+      setShowError(true)
     }
   }
   
-  // Refetch balance on successful claim
+  // ✅ OPTIMIZED: Success handling with auto-refresh
   useEffect(() => {
     if (isSuccess) {
-      refetchBalance()
+      setShowSuccess(true)
+      setShowError(false)
+      
+      // Refresh the correct balance based on selected token
+      const refreshBalance = () => {
+        if (selectedToken === 'WETH') refetchWethBalance()
+        if (selectedToken === 'USDC') refetchUsdcBalance()
+        if (selectedToken === 'MNT') refetchMntBalance()
+      }
+      
+      // Refresh immediately and after a short delay
+      refreshBalance()
+      setTimeout(refreshBalance, 2000)
+      
+      // Reset form
       setCustomAmount('')
       setUseCustomAmount(false)
+      
+      // Auto-hide success message
+      setTimeout(() => setShowSuccess(false), 5000)
     }
-  }, [isSuccess, refetchBalance])
+  }, [isSuccess, selectedToken, refetchWethBalance, refetchUsdcBalance, refetchMntBalance])
+  
+  // ✅ OPTIMIZED: Error handling
+  useEffect(() => {
+    if (error) {
+      const message = error.message?.includes('User rejected') 
+        ? 'Transaction cancelled by user'
+        : error.message?.includes('insufficient funds')
+        ? 'Insufficient funds for gas fees'
+        : error.message?.includes('Faucet cooldown active')
+        ? 'Faucet cooldown is active. Please wait before claiming again.'
+        : error.message || 'Failed to claim tokens'
+        
+      setErrorMessage(message)
+      setShowError(true)
+      setTimeout(() => setShowError(false), 8000)
+    }
+  }, [error])
+  
+  // ✅ FIXED: Reset custom amount state when switching to MNT
+  useEffect(() => {
+    if (selectedToken === 'MNT' && useCustomAmount) {
+      setUseCustomAmount(false)
+      setCustomAmount('')
+    }
+  }, [selectedToken])
   
   // Check if custom amount is valid
   const isCustomAmountValid = () => {
@@ -91,6 +144,46 @@ export default function FaucetPage() {
     const amount = parseFloat(customAmount)
     const maxAmount = parseFloat(currentConfig.maxFaucetAmount)
     return amount > 0 && amount <= maxAmount
+  }
+
+  // ✅ ADDED: Format cooldown time remaining
+  const formatTimeRemaining = (seconds: bigint): string => {
+    const totalSeconds = Number(seconds)
+    if (totalSeconds <= 0) return ''
+    
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`
+    } else {
+      return `${secs}s`
+    }
+  }
+
+  // ✅ ADDED: Check if user can claim (considering cooldowns)
+  const canClaimFaucet = () => {
+    if (!isConnected) return false
+    if (isPending) return false
+    if (useCustomAmount && currentConfig.supportsCustomAmount && !isCustomAmountValid()) return false
+    
+    // Check cooldown for current token
+    if (canUseFaucet?.data === false) return false
+    
+    return true
+  }
+
+  // ✅ OPTIMIZED: Get current balance for selected token
+  const getCurrentBalance = () => {
+    switch (selectedToken) {
+      case 'WETH': return wethBalance ? formatTokenAmount(wethBalance, 'WETH') : '0'
+      case 'USDC': return usdcBalance ? formatTokenAmount(usdcBalance, 'USDC') : '0'
+      case 'MNT': return mntBalance ? formatTokenAmount(mntBalance, 'MNT') : '0'
+      default: return '0'
+    }
   }
 
   return (
@@ -135,11 +228,20 @@ export default function FaucetPage() {
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Test Token Faucet</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Get test WETH and USDC tokens for the Mantle Sepolia testnet. Use these tokens to test the FOMO Insurance protocol.
+            Get test WETH, MNT, and USDC tokens for the Mantle Sepolia testnet. 
+            <span className="font-semibold text-green-600"> WETH & USDC have minimal cooldowns!</span>
+            <span className="font-semibold text-amber-600"> MNT has a 24-hour cooldown.</span>
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex justify-center space-x-3">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
+              <Zap className="w-4 h-4 mr-1" />
+              Fast Claims
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
               Mantle Sepolia Testnet
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-700">
+              MNT: 24h Cooldown
             </span>
           </div>
         </div>
@@ -154,14 +256,36 @@ export default function FaucetPage() {
           </Alert>
         )}
 
-        {/* Faucet Cards */}
+        {/* Success/Error Alerts */}
+        {showSuccess && (
+          <Alert className="mb-8">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              🎉 Tokens claimed successfully! Check your wallet balance.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {showError && (
+          <Alert variant="destructive" className="mb-8">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {errorMessage}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* ✅ OPTIMIZED: Single card layout for better performance */}
         <div className="grid md:grid-cols-2 gap-8 mb-8">
-          {/* Token Selection & Claim */}
+          {/* Claim Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Claim Test Tokens</CardTitle>
+              <CardTitle className="flex items-center">
+                <Zap className="w-5 h-5 mr-2 text-green-600" />
+                Instant Token Claims
+              </CardTitle>
               <CardDescription>
-                Select a token and claim your test allocation
+                Select a token and claim your test allocation instantly
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -172,40 +296,46 @@ export default function FaucetPage() {
                 </Label>
                 <Select 
                   value={selectedToken} 
-                  onValueChange={(value: 'WETH' | 'USDC') => setSelectedToken(value)}
+                  onValueChange={(value: AnyToken) => setSelectedToken(value)}
                 >
                   <SelectTrigger className="mt-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="WETH">
-                      <div className="flex items-center space-x-2">
-                        <span>WETH - Wrapped Ether</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="USDC">
-                      <div className="flex items-center space-x-2">
-                        <span>USDC - USD Coin</span>
-                      </div>
-                    </SelectItem>
+                    <SelectItem value="WETH">WETH - Wrapped Ether</SelectItem>
+                    <SelectItem value="MNT">MNT - Mantle</SelectItem>
+                    <SelectItem value="USDC">USDC - USD Coin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Current Balance */}
+              {isConnected && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Current Balance</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {parseFloat(getCurrentBalance()).toFixed(selectedToken === 'USDC' ? 2 : 4)} {selectedToken}
+                  </p>
+                </div>
+              )}
 
               {/* Amount Selection */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-sm font-medium">Amount</Label>
-                  <button
-                    type="button"
-                    onClick={() => setUseCustomAmount(!useCustomAmount)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    {useCustomAmount ? 'Use default' : 'Custom amount'}
-                  </button>
+                  {/* ✨ Only show custom amount toggle for tokens that support it */}
+                  {currentConfig.supportsCustomAmount && (
+                    <button
+                      type="button"
+                      onClick={() => setUseCustomAmount(!useCustomAmount)}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      {useCustomAmount ? 'Use default' : 'Custom amount'}
+                    </button>
+                  )}
                 </div>
                 
-                {useCustomAmount ? (
+                {useCustomAmount && currentConfig.supportsCustomAmount ? (
                   <div>
                     <Input
                       type="number"
@@ -224,80 +354,64 @@ export default function FaucetPage() {
                     <p className="font-medium">
                       {currentConfig.defaultFaucetAmount} {currentConfig.symbol}
                     </p>
-                    <p className="text-sm text-gray-600">Default faucet amount</p>
+                    <p className="text-sm text-gray-600">
+                      {currentConfig.supportsCustomAmount 
+                        ? 'Default faucet amount' 
+                        : 'Fixed faucet amount (contract limitation)'
+                      }
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Cooldown Status */}
-              {isConnected && (
-                <div>
-                  {canUseFaucet.data ? (
-                    <div className="flex items-center space-x-2 text-green-600">
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm font-medium">Ready to claim</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-orange-600">
-                      <Clock className="w-4 h-4" />
-                      <span className="text-sm font-medium">
-                        Cooldown: {timeLeft.data ? formatTimeRemaining(timeLeft.data) : 'Loading...'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Claim Button */}
+              {/* ✅ UPDATED: Claim Button with Cooldown Support */}
               <Button
                 onClick={handleClaimFaucet}
-                disabled={
-                  !isConnected || 
-                  isPending || 
-                  (isConnected && !canUseFaucet.data) ||
-                  (useCustomAmount && !isCustomAmountValid())
-                }
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={!canClaimFaucet()}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
                 size="lg"
               >
                 {!isConnected ? (
                   'Connect Wallet'
                 ) : isPending ? (
                   'Claiming...'
-                ) : !canUseFaucet.data ? (
-                  'Cooldown Active'
+                ) : canUseFaucet?.data === false ? (
+                  `Cooldown Active (${formatTimeRemaining(timeLeft?.data || 0n)})`
                 ) : (
-                  `Claim ${useCustomAmount ? customAmount || '0' : currentConfig.defaultFaucetAmount} ${currentConfig.symbol}`
+                  `Claim ${
+                    useCustomAmount && currentConfig.supportsCustomAmount 
+                      ? customAmount || '0' 
+                      : currentConfig.defaultFaucetAmount
+                  } ${currentConfig.symbol}`
                 )}
               </Button>
 
-              {/* Transaction Status */}
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Error: {error.message}
-                  </AlertDescription>
-                </Alert>
+              {/* ✅ ADDED: Cooldown Warning */}
+              {isConnected && canUseFaucet?.data === false && timeLeft?.data && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">
+                    <strong>Cooldown Active:</strong> You can claim again in {formatTimeRemaining(timeLeft.data)}
+                  </p>
+                </div>
               )}
 
-              {isSuccess && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Tokens claimed successfully! Check your wallet balance.
-                  </AlertDescription>
-                </Alert>
+              {/* ✨ MNT Warning */}
+              {selectedToken === 'MNT' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">
+                    <strong>Note:</strong> MNT faucet gives a fixed amount of 100 MNT per claim with a 24-hour cooldown.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Current Balances */}
+          {/* ✅ OPTIMIZED: All Balances Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Your Balances</CardTitle>
+              <CardTitle>Your Test Token Balances</CardTitle>
               <CardDescription>
-                Current test token balances in your wallet
+                Current balances in your connected wallet
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -311,12 +425,29 @@ export default function FaucetPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold">
-                        {balance && selectedToken === 'WETH' 
-                          ? parseFloat(formatTokenAmount(balance, 'WETH')).toFixed(4)
-                          : 'Loading...'
+                        {wethBalance !== undefined
+                          ? parseFloat(formatTokenAmount(wethBalance, 'WETH')).toFixed(4)
+                          : '...'
                         }
                       </p>
                       <p className="text-sm text-gray-600">WETH</p>
+                    </div>
+                  </div>
+
+                  {/* MNT Balance */}
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium">MNT</p>
+                      <p className="text-sm text-gray-600">Mantle</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">
+                        {mntBalance !== undefined
+                          ? parseFloat(formatTokenAmount(mntBalance, 'MNT')).toFixed(4)
+                          : '...'
+                        }
+                      </p>
+                      <p className="text-sm text-gray-600">MNT</p>
                     </div>
                   </div>
 
@@ -328,9 +459,9 @@ export default function FaucetPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold">
-                        {balance && selectedToken === 'USDC'
-                          ? parseFloat(formatTokenAmount(balance, 'USDC')).toFixed(2)
-                          : 'Loading...'
+                        {usdcBalance !== undefined
+                          ? parseFloat(formatTokenAmount(usdcBalance, 'USDC')).toFixed(2)
+                          : '...'
                         }
                       </p>
                       <p className="text-sm text-gray-600">USDC</p>
@@ -346,10 +477,10 @@ export default function FaucetPage() {
           </Card>
         </div>
 
-        {/* Instructions */}
+        {/* ✅ UPDATED: Instructions for testing */}
         <Card>
           <CardHeader>
-            <CardTitle>How to Use</CardTitle>
+            <CardTitle>Testing Instructions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-6">
@@ -366,9 +497,9 @@ export default function FaucetPage() {
                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm mx-auto mb-3">
                   2
                 </div>
-                <h3 className="font-semibold mb-2">Claim Tokens</h3>
+                <h3 className="font-semibold mb-2">Claim Instantly</h3>
                 <p className="text-sm text-gray-600">
-                  Select a token and claim your test allocation
+                  Select any token and claim immediately - no waiting!
                 </p>
               </div>
               <div className="text-center">
@@ -377,18 +508,20 @@ export default function FaucetPage() {
                 </div>
                 <h3 className="font-semibold mb-2">Test the dApp</h3>
                 <p className="text-sm text-gray-600">
-                  Use your tokens to test FOMO Insurance features
+                  Use your tokens to test FOMO Insurance policies
                 </p>
               </div>
             </div>
             
-            <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h4 className="font-semibold text-yellow-800 mb-2">Important Notes</h4>
-              <ul className="text-sm text-yellow-700 space-y-1">
-                <li>• These are test tokens with no real value</li>
-                <li>• There's a 24-hour cooldown between faucet claims</li>
-                <li>• Maximum claim amounts: 10 WETH, 10,000 USDC</li>
-                <li>• Only works on Mantle Sepolia testnet</li>
+            <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h4 className="font-semibold text-green-800 mb-2">Testing Mode Active</h4>
+              <ul className="text-sm text-green-700 space-y-1">
+                <li>• ⚡ <strong>WETH & USDC:</strong> Minimal or no cooldowns for rapid testing</li>
+                <li>• 🚰 <strong>Higher limits:</strong> Up to 100 WETH, 100 MNT, 50K USDC</li>
+                <li>• 🧪 <strong>Perfect for testing:</strong> Create multiple policies</li>
+                <li>• 🔄 <strong>Instant refresh:</strong> Balances update automatically</li>
+                <li>• ⏰ <strong>MNT Cooldown:</strong> 24-hour cooldown between MNT claims</li>
+                <li>• 💡 <strong>Tip:</strong> Use WETH for rapid testing, MNT for final tests</li>
               </ul>
             </div>
           </CardContent>
@@ -398,8 +531,8 @@ export default function FaucetPage() {
         <div className="text-center mt-12">
           <h3 className="text-lg font-semibold mb-4">Ready to test?</h3>
           <div className="flex justify-center space-x-4">
-          <Link href="/app">
-              <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50">
+            <Link href="/app">
+              <Button className="bg-blue-600 hover:bg-blue-700">
                 Go to dApp
               </Button>
             </Link>

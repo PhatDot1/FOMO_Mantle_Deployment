@@ -1,7 +1,7 @@
-// lib/web3-config.ts - FINAL CORRECTED VERSION
-import { createConfig, http } from 'wagmi'
-import { metaMask, walletConnect } from 'wagmi/connectors'
-import { defineChain } from 'viem'
+// lib/web3-config.ts
+import { createConfig, http } from 'wagmi';
+import { metaMask, walletConnect } from 'wagmi/connectors';
+import { defineChain } from 'viem';
 
 // Define Mantle Sepolia Testnet chain
 export const mantleSepolia = defineChain({
@@ -14,7 +14,10 @@ export const mantleSepolia = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://endpoints.omniatech.io/v1/mantle/sepolia/public'],
+      http: ['https://rpc.sepolia.mantle.xyz'],
+    },
+    public: {
+      http: ['https://rpc.sepolia.mantle.xyz'],
     },
   },
   blockExplorers: {
@@ -24,7 +27,7 @@ export const mantleSepolia = defineChain({
     },
   },
   testnet: true,
-})
+});
 
 export const wagmiConfig = createConfig({
   chains: [mantleSepolia],
@@ -38,15 +41,16 @@ export const wagmiConfig = createConfig({
     [mantleSepolia.id]: http(),
   },
   ssr: true,
-})
+});
 
-// ✅ FINAL CORRECTED CONTRACT ADDRESSES
+// ✨ UPDATED: All new contract addresses from your latest deployment
 export const CONTRACT_ADDRESSES = {
-  MOCK_WETH: '0x34B68f19Ac9028a505bb6be756472ee800D6e88e', // ✅ Correct WETH address
-  MOCK_USDC: '0x5B855A6913F962d377D70126038062D1BFe2bb14', // ✅ Correct USDC address
-  POLICY_STORAGE: '0x90E9058038bd81C1887c6Abd6A7144222924C044',
-  POLICY_MANAGER: '0x3c0Fa9c8D2c37Ee7Fd72571F0193C8F93B3B521b',
-  SETTLEMENT_ENGINE: '0x8F2794B3af4f1DF45CB9eB1Bf712077eE99D253b',
-  FOMO_INSURANCE: '0xDE956862C0177B0129Ba54f4D8895d1bfEf0BF52',
-  PRICE_ORACLE: '0x1AC24F374baFcd0E2da27F1078CE8F4Da438561b',
-} as const
+  MOCK_WETH: '0xEBcBae3E66F30C5Cb6585ea9C31E09bBE8591a61',
+  MOCK_USDC: '0x5E618eBBFD1e69B7909d14e607acadccac626B4E',
+  MOCK_MNT: '0xD55030D27553c974133Fd71c096c1fF400DC6e25', // ✨ ADDED
+  PRICE_ORACLE: '0xD6c7693c122dF70E3e8807411222d4aC60069b00',
+  POLICY_STORAGE: '0x8575B0C8567aeEe60cbD260A1b946eb94Dbe8c7F',
+  POLICY_MANAGER: '0x0737364BbEB5Da199CA3fb43409f7325E2E94521',
+  SETTLEMENT_ENGINE: '0xB497fa96BC5eABC698672Cf5B4b3489f5Db6Ccf8',
+  FOMO_INSURANCE: '0xcDE6374279E133F82cf6e051a665e5740c1C4612',
+} as const;

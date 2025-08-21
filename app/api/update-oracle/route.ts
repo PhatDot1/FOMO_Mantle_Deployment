@@ -1,5 +1,4 @@
-// app/api/update-oracle/route.ts
-// Runtime: Node (not edge)
+// app/api/update-oracle/route.ts - FIXED with proper nonce management
 import { NextRequest, NextResponse } from 'next/server'
 import {
   createPublicClient,
@@ -13,15 +12,15 @@ import { mantleSepolia } from '@/lib/web3-config'
 export const dynamic = 'force-dynamic'
 
 // ───────────────────────────────────────────────────────────────────────────────
-// CONFIG
+// CONFIG - UPDATED ADDRESSES
 // ───────────────────────────────────────────────────────────────────────────────
 
 const CONTRACT_ADDRESSES = {
-  PRICE_ORACLE: '0x1AC24F374baFcd0E2da27F1078CE8F4Da438561b',
+  PRICE_ORACLE: '0xD6c7693c122dF70E3e8807411222d4aC60069b00',
 } as const
 
-// Run a state-changing update at most once every 10,000 seconds (≈2.78h)
-const UPDATE_INTERVAL_SECONDS = 10_000
+// Update more frequently for testing - every 30 seconds
+const UPDATE_INTERVAL_SECONDS = 30
 
 // In-memory throttle (per server instance)
 let lastWriteMs = 0
@@ -36,7 +35,6 @@ const ORACLE_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'symbol', type: 'string' },
-      // NOTE: contract expects price in 18 decimals; it converts to 8 internally
       { internalType: 'uint256', name: 'priceInUSD', type: 'uint256' },
       { internalType: 'uint256', name: 'confidence', type: 'uint256' },
       { internalType: 'string', name: 'source', type: 'string' },
@@ -63,7 +61,7 @@ const ORACLE_ABI = [
     type: 'function',
   },
 
-  // non-reverting detailed read (use this for UI)
+  // non-reverting detailed read
   {
     inputs: [{ internalType: 'string', name: 'symbol', type: 'string' }],
     name: 'getLivePriceInfo',
@@ -104,7 +102,7 @@ const ORACLE_ABI = [
 ] as const
 
 type PriceStatus = {
-  symbol: 'WETH' | 'USDC'
+  symbol: 'WETH' | 'USDC' | 'MNT'
   marketPrice: number
   oraclePrice: number | null
   lastUpdated: string | null
@@ -119,6 +117,7 @@ type PriceStatus = {
 const TOKENS = [
   { symbol: 'WETH' as const, coingeckoKey: 'weth' },       // real WETH price
   { symbol: 'USDC' as const, coingeckoKey: 'usd-coin' },   // real USDC price
+  { symbol: 'MNT' as const, coingeckoKey: 'mantle' },      // real MNT price
 ]
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -134,17 +133,23 @@ function shouldWrite(): boolean {
   return delta >= UPDATE_INTERVAL_SECONDS
 }
 
-// Convert a float price to 18-decimals BigInt (for updateLivePrice input)
-function toPrice18(market: number): bigint {
+// Convert a float price to 8-decimals BigInt
+function toPrice8Decimals(market: number): bigint {
   // guard
   if (!Number.isFinite(market) || market <= 0) return 0n
-  // use viem's parseUnits to avoid FP mistakes
-  return parseUnits(market.toFixed(18), 18)
+  // Convert to 8 decimals for the oracle contract
+  const price8Dec = Math.floor(market * 1e8)
+  return BigInt(price8Dec)
 }
 
 function pctDiff(a: number, b: number) {
   const d = Math.abs(a - b)
   return b === 0 ? 0 : (d / b) * 100
+}
+
+// ✅ FIXED: Add proper delay function
+async function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -154,70 +159,117 @@ function pctDiff(a: number, b: number) {
 export async function GET(_req: NextRequest) {
   const publicClient = createPublicClient({ chain: mantleSepolia, transport: http() })
 
-  // 1) Fetch market prices (WETH, USDC only)
-  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=weth,usd-coin&vs_currencies=usd'
+  // 1) Fetch market prices for WETH, USDC, and MNT
+  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=weth,usd-coin,mantle&vs_currencies=usd'
   const marketRes = await fetch(url, { headers: { Accept: 'application/json' } })
   if (!marketRes.ok) {
     return NextResponse.json({ success: false, error: `CoinGecko ${marketRes.status}` }, { status: 502 })
   }
   const marketJson = await marketRes.json() as Record<string, { usd: number }>
 
+  console.log('📊 Fetched market prices:', marketJson)
+
   // 2) Build wallet client if we *may* write
   let walletClient: ReturnType<typeof createWalletClient> | null = null
   let account: ReturnType<typeof privateKeyToAccount> | null = null
   let updatedWithPrivateKey = false
+  let authorizationStatus = 'Not checked'
+  let updateResults: { [key: string]: string } = {}
 
   const attemptWrite = shouldWrite()
+  console.log(`🔧 Should attempt write: ${attemptWrite} (last write: ${(nowMs() - lastWriteMs) / 1000}s ago)`)
+
   if (attemptWrite && !isUpdating) {
     const pk = process.env.ORACLE_PRIVATE_KEY
+    console.log(`🔑 Private key available: ${pk ? 'YES' : 'NO'}`)
+    
     if (pk && pk.startsWith('0x') && pk.length === 66) {
       try {
         account = privateKeyToAccount(pk as `0x${string}`)
         walletClient = createWalletClient({ account, chain: mantleSepolia, transport: http() })
-        updatedWithPrivateKey = true
-      } catch {
-        // ignore; will fall back to read-only
+        console.log(`📝 Wallet client created for: ${account.address}`)
+
+        // Check if this account is authorized
+        try {
+          const isUpdater = await publicClient.readContract({
+            address: CONTRACT_ADDRESSES.PRICE_ORACLE,
+            abi: ORACLE_ABI,
+            functionName: 'isAPIUpdater',
+            args: [account.address],
+          })
+          authorizationStatus = isUpdater ? 'Authorized ✅' : 'Not Authorized ❌'
+          console.log(`🔐 Authorization status: ${authorizationStatus}`)
+          
+          if (isUpdater) {
+            updatedWithPrivateKey = true
+          }
+        } catch (authError) {
+          console.error('❌ Error checking authorization:', authError)
+          authorizationStatus = 'Check Failed'
+        }
+      } catch (walletError) {
+        console.error('❌ Error creating wallet:', walletError)
         updatedWithPrivateKey = false
       }
+    } else {
+      console.log('❌ Invalid or missing ORACLE_PRIVATE_KEY')
     }
   }
 
-  // 3) Optionally perform a *single* write cycle (throttled)
-  if (attemptWrite && walletClient && account && !isUpdating) {
+  // 3) ✅ FIXED: Perform write cycle with proper nonce management
+  if (attemptWrite && walletClient && account && updatedWithPrivateKey && !isUpdating) {
     isUpdating = true
+    console.log('🔄 Starting price update cycle...')
+    
     try {
-      // Optional: check if this account is authorized updater
-      // (not strictly required; we'll catch Unauthorized on write)
-      // const isUpdater = await publicClient.readContract({
-      //   address: CONTRACT_ADDRESSES.PRICE_ORACLE,
-      //   abi: ORACLE_ABI,
-      //   functionName: 'isAPIUpdater',
-      //   args: [account.address],
-      // })
-      // if (!isUpdater) console.log('ℹ️ Not an authorized API updater; writes may revert.')
+      // ✅ FIXED: Get current nonce and manage it manually
+      let currentNonce = await publicClient.getTransactionCount({
+        address: account.address,
+        blockTag: 'pending'
+      })
+      console.log(`📋 Starting nonce: ${currentNonce}`)
 
-      // Write both tokens sequentially
+      // Write all three tokens sequentially with proper nonce management
       for (const t of TOKENS) {
         const marketPrice = marketJson[t.coingeckoKey]?.usd
-        if (!marketPrice) continue
+        if (!marketPrice) {
+          console.log(`⚠️ No market price for ${t.symbol}`)
+          updateResults[t.symbol] = 'No market price'
+          continue
+        }
 
-        const price18 = toPrice18(marketPrice) // 18-dec as expected by updateLivePrice
+        const price8Dec = toPrice8Decimals(marketPrice)
+        console.log(`💰 ${t.symbol}: $${marketPrice} → ${price8Dec.toString()} (8-decimal)`)
+        
         try {
-          await walletClient.writeContract({
+          // ✅ FIXED: Use manual nonce management
+          const tx = await walletClient.writeContract({
             address: CONTRACT_ADDRESSES.PRICE_ORACLE,
             abi: ORACLE_ABI,
             functionName: 'updateLivePrice',
-            args: [t.symbol, price18, 95n, 'CoinGecko: WETH/USDC'],
+            args: [t.symbol, price8Dec, 95n, 'NextJS API: CoinGecko'],
+            nonce: currentNonce, // ✅ FIXED: Explicitly set nonce
           })
-          // tiny pause helps explorers pick it up before we read
-          await new Promise((r) => setTimeout(r, 1200))
+          console.log(`✅ ${t.symbol} update tx: ${tx}`)
+          updateResults[t.symbol] = `Success: ${tx}`
+          
+          // ✅ FIXED: Increment nonce for next transaction
+          currentNonce++
+          
+          // ✅ FIXED: Wait longer between transactions (3 seconds)
+          await delay(3000)
         } catch (e: any) {
-          // Unauthorized or any revert — we’ll continue read-only
-          updatedWithPrivateKey = false
+          console.error(`❌ Failed to update ${t.symbol}:`, e.shortMessage || e.message)
+          updateResults[t.symbol] = `Error: ${e.shortMessage || e.message}`
+          // Continue with other tokens, but increment nonce in case the tx was actually sent
+          currentNonce++
         }
       }
 
       lastWriteMs = nowMs()
+      console.log('✅ Price update cycle completed')
+    } catch (error) {
+      console.error('❌ Update cycle failed:', error)
     } finally {
       isUpdating = false
     }
@@ -276,7 +328,7 @@ export async function GET(_req: NextRequest) {
         if (!info.isLive) {
           status = 'NO_LIVE_PRICE'
         } else {
-          oraclePrice = Number(info.price) / 1e8
+          oraclePrice = Number(info.price) / 1e8 // Convert from 8 decimals
           lastUpdated = new Date(Number(info.lastUpdated) * 1000).toISOString()
           ageSecondsNum = Number(info.ageSeconds)
           confidenceNum = Number(info.confidence)
@@ -300,7 +352,7 @@ export async function GET(_req: NextRequest) {
         }
       }
     } catch (e: any) {
-      // If anything throws (including custom errors from getPrice), classify helpfully
+      // If anything throws, classify helpfully
       const msg = (e?.shortMessage || e?.message || 'read failed') as string
       error = msg.includes('UnsupportedSymbol') ? 'UnsupportedSymbol' :
               msg.includes('PriceNotAvailable') ? 'PriceNotAvailable' :
@@ -321,7 +373,7 @@ export async function GET(_req: NextRequest) {
     })
   }
 
-  // 5) Health
+  // 5) Health check
   let oracleHealthy = false
   try {
     oracleHealthy = (await publicClient.readContract({
@@ -338,13 +390,16 @@ export async function GET(_req: NextRequest) {
     timestamp: new Date().toISOString(),
     oracleHealthy,
     updatedWithPrivateKey,
+    authorizationStatus,
+    updateResults, // ✅ ADDED: Show individual update results
     priceStatus,
     marketData: {
       weth: { usd: marketJson['weth']?.usd ?? null },
       'usd-coin': { usd: marketJson['usd-coin']?.usd ?? null },
+      mantle: { usd: marketJson['mantle']?.usd ?? null },
     },
     message: updatedWithPrivateKey
-      ? `Oracle prices updated (throttled ≥ ${UPDATE_INTERVAL_SECONDS}s)`
-      : `Read-only mode (next write after ${Math.max(0, UPDATE_INTERVAL_SECONDS - Math.floor((nowMs() - lastWriteMs)/1000))}s)`,
+      ? `Oracle prices updated! WETH: ${updateResults.WETH || 'N/A'}, USDC: ${updateResults.USDC || 'N/A'}, MNT: ${updateResults.MNT || 'N/A'}`
+      : `Read-only mode: ${authorizationStatus}. Next write attempt in ${Math.max(0, UPDATE_INTERVAL_SECONDS - Math.floor((nowMs() - lastWriteMs)/1000))}s`,
   })
 }
