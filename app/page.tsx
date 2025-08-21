@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useAccount } from 'wagmi'
@@ -16,6 +16,15 @@ export default function LandingPage() {
   const [showFullChart, setShowFullChart] = useState(false)
   const { isConnected, address } = useAccount()
   const { connectWallet, isConnecting } = useTomoWallet()
+
+  // Capture referral from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const ref = urlParams.get('ref')
+    if (ref) {
+      localStorage.setItem('fomoinsurance:referrer', ref)
+    }
+  }, [])
 
   const toggleChart = () => {
     setShowFullChart(!showFullChart)
@@ -39,6 +48,9 @@ export default function LandingPage() {
                 </Link>
                 <Link href="#faq" className="text-gray-600 hover:text-blue-600 transition-colors">
                   FAQ
+                </Link>
+                <Link href="#waitlist" className="text-gray-600 hover:text-blue-600 transition-colors">
+                  Waitlist
                 </Link>
                 <Link href="/faucet" className="text-gray-600 hover:text-blue-600 transition-colors">
                   Faucet

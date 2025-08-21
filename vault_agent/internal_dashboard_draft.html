@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantle Vault APY Maximizer Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #fff, #f0f8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+
+        .vault-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .strategy-icon { background: linear-gradient(135deg, #f093fb, #f5576c); }
+        .performance-icon { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .control-icon { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+        .card-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #666;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        .neutral { color: #6b7280; }
+
+        .strategy-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8fafc;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .strategy-name {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .strategy-apy {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #10b981;
+        }
+
+        .strategy-allocation {
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active { background: #10b981; }
+        .status-inactive { background: #ef4444; }
+        .status-warning { background: #f59e0b; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            border-color: #10b981;
+            color: #059669;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            border-color: #f59e0b;
+            color: #d97706;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #dc2626;
+        }
+
+        .risk-tolerance {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .risk-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .risk-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Mantle Vault APY Maximizer</h1>
+            <p>Intelligent DeFi yield optimization on Mantle Network</p>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Vault Overview -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon vault-icon">🏦</div>
+                    <div class="card-title">Vault Overview</div>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Total Value Locked</span>
+                    <span class="metric-value" id="total-tvl">$0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Available Balance</span>
+                    <span class="metric-value" id="available-balance">$0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Current APY</span>
+                    <span class="metric-value positive" id="current-apy">0.00%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Agent Status</span>
+                    <span class="metric-value">
+                        <span class="status-indicator status-active" id="agent-status-indicator"></span>
+                        <span id="agent-status">Active</span>
+                    </span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Last Rebalance</span>
+                    <span class="metric-value" id="last-rebalance">Never</span>
+                </div>
+            </div>
+
+            <!-- Strategy Performance -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon strategy-icon">📈</div>
+                    <div class="card-title">Strategy Performance</div>
+                </div>
+                <div id="strategies-list">
+                    <div class="strategy-item">
+                        <div>
+                            <div class="strategy-name">INIT Capital Looping</div>
+                            <div class="strategy-allocation">Allocation: 45.0%</div>
+                        </div>
+                        <div class="strategy-apy">8.5%</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div>
+                            <div class="strategy-name">Circuit Protocol Vault</div>
+                            <div class="strategy-allocation">Allocation: 35.0%</div>
+                        </div>
+                        <div class="strategy-apy">6.8%</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div>
+                            <div class="strategy-name">MNT Staking</div>
+                            <div class="strategy-allocation">Allocation: 20.0%</div>
+                        </div>
+                        <div class="strategy-apy">4.5%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon performance-icon">📊</div>
+                    <div class="card-title">APY Trends</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="apy-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Agent Controls -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon control-icon">⚙️</div>
+                    <div class="card-title">Agent Controls</div>
+                </div>
+                
+                <div class="alert alert-warning" id="rebalance-alert" style="display: none;">
+                    <strong>Rebalance Recommended:</strong> Significant APY spread detected (>1.0%)
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Risk Tolerance:</label>
+                    <div class="risk-tolerance">
+                        <div class="risk-btn" data-risk="conservative">Conservative</div>
+                        <div class="risk-btn active" data-risk="moderate">Moderate</div>
+                        <div class="risk-btn" data-risk="aggressive">Aggressive</div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="refreshDashboard()">
+                        <span id="refresh-loading" style="display: none;" class="loading"></span>
+                        Refresh Data
+                    </button>
+                    <button class="btn btn-success" onclick="executeRebalance()">
+                        <span id="rebalance-loading" style="display: none;" class="loading"></span>
+                        Rebalance Now
+                    </button>
+                    <button class="btn btn-warning" onclick="optimizeAllocation()">
+                        Optimize Allocation
+                    </button>
+                    <button class="btn btn-danger" onclick="emergencyWithdraw()">
+                        Emergency Stop
+                    </button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div class="metric">
+                        <span class="metric-label">Auto-Rebalance</span>
+                        <span class="metric-value">
+                            <input type="checkbox" id="auto-rebalance" checked> Every 6 hours
+                        </span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Rebalance Threshold</span>
+                        <span class="metric-value">0.5% APY difference</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #a855f7);">📝</div>
+                <div class="card-title">Recent Activity</div>
+            </div>
+            <div id="activity-log">
+                <div class="alert alert-success">
+                    <strong>2025-01-21 14:30:</strong> Agent initialized successfully
+                </div>
+                <div class="alert alert-warning">
+                    <strong>2025-01-21 14:25:</strong> APY spread detected: INIT (8.5%) vs Circuit (6.8%)
+                </div>
+                <div class="alert alert-success">
+                    <strong>2025-01-21 14:20:</strong> Rebalance completed: 45% INIT, 35% Circuit, 20% MNT
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🚀 Powered by LangGraph & LangChain | 🔗 Built for Mantle Network</p>
+            <p>Agent Version 1.0.0 | Last Updated: <span id="last-updated">Never</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let selectedRiskTolerance = 'moderate';
+        let dashboardData = {};
+        let apyChart = null;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeRiskButtons();
+            initializeChart();
+            refreshDashboard();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(refreshDashboard, 30000);
+        });
+
+        // Risk tolerance selection
+        function initializeRiskButtons() {
+            const riskBtns = document.querySelectorAll('.risk-btn');
+            riskBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    riskBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    selectedRiskTolerance = this.dataset.risk;
+                });
+            });
+        }
+
+        // Initialize APY chart
+        function initializeChart() {
+            const ctx = document.getElementById('apy-chart').getContext('2d');
+            
+            apyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [
+                        {
+                            label: 'INIT Capital',
+                            data: generateMockAPYData(8.5, 24),
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Circuit Protocol',
+                            data: generateMockAPYData(6.8, 24),
+                            borderColor: '#f093fb',
+                            backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'MNT Staking',
+                            data: generateMockAPYData(4.5, 24),
+                            borderColor: '#43e97b',
+                            backgroundColor: 'rgba(67, 233, 123, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'APY (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (Hours)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Generate mock APY data
+        function generateMockAPYData(baseAPY, points) {
+            return Array.from({length: points}, () => 
+                baseAPY + (Math.random() - 0.5) * 2
+            );
+        }
+
+        // Refresh dashboard data
+        async function refreshDashboard() {
+            const loading = document.getElementById('refresh-loading');
+            loading.style.display = 'inline-block';
+
+            try {
+                // Simulate API call to agent
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update mock data
+                updateVaultMetrics();
+                updateStrategyPerformance();
+                updateChart();
+                updateActivityLog('Dashboard refreshed successfully');
+                
+                document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('Error refreshing dashboard:', error);
+                updateActivityLog('Dashboard refresh failed: ' + error.message, 'error');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Update vault metrics
+        function updateVaultMetrics() {
+            const mockTVL = 125000 + (Math.random() - 0.5) * 10000;
+            const mockAvailable = 12500 + (Math.random() - 0.5) * 2000;
+            const mockAPY = 7.2 + (Math.random() - 0.5) * 1;
+            
+            document.getElementById('total-tvl').textContent = `$${mockTVL.toLocaleString()}`;
+            document.getElementById('available-balance').textContent = `$${mockAvailable.toLocaleString()}`;
+            document.getElementById('current-apy').textContent = `${mockAPY.toFixed(2)}%`;
+            
+            // Update last rebalance
+            const now = new Date();
+            const lastRebalance = new Date(now.getTime() - (Math.random() * 6 * 60 * 60 * 1000));
+            document.getElementById('last-rebalance').textContent = lastRebalance.toLocaleTimeString();
+        }
+
+        // Update strategy performance
+        function updateStrategyPerformance() {
+            const strategies = [
+                { name: 'INIT Capital Looping', allocation: 45.0, baseAPY: 8.5 },
+                { name: 'Circuit Protocol Vault', allocation: 35.0, baseAPY: 6.8 },
+                { name: 'MNT Staking', allocation: 20.0, baseAPY: 4.5 }
+            ];
+
+            let html = '';
+            strategies.forEach(strategy => {
+                const currentAPY = strategy.baseAPY + (Math.random() - 0.5) * 1;
+                html += `
+                    <div class="strategy-item">
+                        <div>
+                            <div class="strategy-name">${strategy.name}</div>
+                            <div class="strategy-allocation">Allocation: ${strategy.allocation}%</div>
+                        </div>
+                        <div class="strategy-apy">${currentAPY.toFixed(1)}%</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('strategies-list').innerHTML = html;
+        }
+
+        // Update chart with new data
+        function updateChart() {
+            if (apyChart) {
+                apyChart.data.datasets[0].data = generateMockAPYData(8.5, 24);
+                apyChart.data.datasets[1].data = generateMockAPYData(6.8, 24);
+                apyChart.data.datasets[2].data = generateMockAPYData(4.5, 24);
+                apyChart.update();
+            }
+        }
+
+        // Execute rebalance
+        async function executeRebalance() {
+            const loading = document.getElementById('rebalance-loading');
+            loading.style.display = 'inline-block';
+
+            try {
+                // Simulate rebalance execution
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                updateActivityLog(`Rebalance executed with ${selectedRiskTolerance} risk tolerance`, 'success');
+                updateVaultMetrics();
+                
+            } catch (error) {
+                console.error('Error executing rebalance:', error);
+                updateActivityLog('Rebalance failed: ' + error.message, 'error');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Optimize allocation
+        async function optimizeAllocation() {
+            try {
+                updateActivityLog('Calculating optimal allocation...', 'warning');
+                
+                // Simulate optimization
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                const newAllocations = {
+                    'INIT Capital': '50%',
+                    'Circuit Protocol': '30%', 
+                    'MNT Staking': '20%'
+                };
+                
+                updateActivityLog(`Optimal allocation calculated: ${JSON.stringify(newAllocations)}`, 'success');
+                
+            } catch (error) {
+                updateActivityLog('Optimization failed: ' + error.message, 'error');
+            }
+        }
+
+        // Emergency withdraw
+        async function emergencyWithdraw() {
+            if (confirm('Are you sure you want to execute emergency withdrawal? This will stop the agent and withdraw all funds.')) {
+                try {
+                    updateActivityLog('Emergency withdrawal initiated...', 'warning');
+                    
+                    // Update agent status
+                    document.getElementById('agent-status').textContent = 'Stopped';
+                    document.getElementById('agent-status-indicator').className = 'status-indicator status-inactive';
+                    
+                    updateActivityLog('Emergency withdrawal completed. Agent stopped.', 'success');
+                    
+                } catch (error) {
+                    updateActivityLog('Emergency withdrawal failed: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Update activity log
+        function updateActivityLog(message, type = 'success') {
+            const log = document.getElementById('activity-log');
+            const timestamp = new Date().toLocaleString();
+            const alertClass = type === 'error' ? 'alert-error' : type === 'warning' ? 'alert-warning' : 'alert-success';
+            
+            const newEntry = document.createElement('div');
+            newEntry.className = `alert ${alertClass}`;
+            newEntry.innerHTML = `<strong>${timestamp}:</strong> ${message}`;
+            
+            // Add to top of log
+            log.insertBefore(newEntry, log.firstChild);
+            
+            // Keep only last 10 entries
+            while (log.children.length > 10) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        // Auto-rebalance toggle
+        document.getElementById('auto-rebalance').addEventListener('change', function() {
+            const status = this.checked ? 'enabled' : 'disabled';
+            updateActivityLog(`Auto-rebalance ${status}`, 'warning');
+        });
+    </script>
+</body>
+</html>
