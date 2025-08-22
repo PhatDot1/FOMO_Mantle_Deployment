@@ -4,7 +4,7 @@
 FOMO Insurance is a decentralized protocol built on **Mantle** that allows crypto holders to cash out their crypto for stablecoins *and still retain upside exposure* if the market rises after they exit. 
 This provides a new risk-management primitive in DeFi that mirrors structured financial products in TradFi, giving users both immediate liquidity and a share of future gains. 
 
-**View the demo here**: https://fomo-insurance.vercel.app/
+**View the demo here**: http://demo.fomoinsurance.com/
 
 ---
 
